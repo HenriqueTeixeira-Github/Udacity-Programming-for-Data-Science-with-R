@@ -96,3 +96,113 @@ FROM
     FROM family_films AS ff) AS sub
 GROUP BY 1,2
 ORDER BY 1,2;
+
+-- Question Set #2
+
+-- Question #1
+
+-- We want to find out how the two stores compare in their count of rental orders during every month for all the years we have data for.
+-- Write a query that returns the store ID for the store, the year and month and the number of rental orders each store has fulfilled for that month.
+-- Your table should include a column for each of the following: year, month, store ID and count of rental orders fulfilled during that month.
+
+SELECT
+    DATE_PART('month', r.rental_date) AS rental_month,
+    DATE_PART('year', r.rental_date) AS rental_year,
+    str.store_id AS store_id,
+    COUNT(*) AS rental_count
+FROM rental AS r
+JOIN staff AS stf
+ON r.staff_id = stf.staff_id
+JOIN store AS str
+ON stf.store_id = str.store_id
+GROUP BY 1,2,3
+ORDER BY 4 DESC
+
+-- Question #2
+
+-- We would like to know who were our top 10 paying customers, how many payments they made on a monthly basis during 2007, and what was the amount of the monthly payments.
+-- Can you write a query to capture the customer name, month and year of payment, and total payment amount for each month by these top 10 paying customers?
+
+WITH sub AS (
+    SELECT
+        p.payment_id AS payment_id,
+        c.customer_id AS customer_id,
+        CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+        p.amount AS payment_amout,
+        p.payment_date AS payment_date
+    FROM customer AS c
+    JOIN payment AS p
+    ON c.customer_id = p.customer_id
+)
+
+SELECT
+    DATE_TRUNC('month', payment_date) AS rental_month,
+    full_name,
+    COUNT(*) AS count_payments_per_month,
+    SUM(payment_amout) AS sum_amount_per_month
+FROM sub
+WHERE full_name IN
+    (SELECT
+        full_name
+    FROM sub
+    WHERE DATE_PART('year', payment_date) = 2007
+    GROUP BY 1
+    ORDER BY SUM(payment_amout) DESC
+    LIMIT 10
+)
+GROUP BY 1,2
+ORDER BY 2,1
+
+
+-- Question #3
+
+-- Finally, for each of these top 10 paying customers, I would like to find out the difference across their monthly payments during 2007. Please go ahead and write a query to compare the payment amounts in each successive month.
+-- Repeat this for each of these 10 paying customers. Also, it will be tremendously helpful if you can identify the customer name who paid the most difference in terms of payments.
+
+WITH sub AS (
+    SELECT
+        p.payment_id AS payment_id,
+        c.customer_id AS customer_id,
+        CONCAT(c.first_name, ' ', c.last_name) AS full_name,
+        p.amount AS payment_amout,
+        p.payment_date AS payment_date
+    FROM customer AS c
+    JOIN payment AS p
+    ON c.customer_id = p.customer_id
+)
+
+SELECT
+    *
+FROM
+    (SELECT
+        rental_month,
+        full_name,
+        sum_amount_per_month AS current_sum_amount_per_month,
+        LEAD(sum_amount_per_month) OVER (ORDER BY full_name, rental_month) AS lead_sum_amount_per_month,
+        CASE
+            WHEN full_name = LEAD(full_name) OVER (ORDER BY full_name, rental_month) THEN LEAD(sum_amount_per_month) OVER (ORDER BY full_name, rental_month) - sum_amount_per_month
+            ELSE null
+        END
+            AS diff
+    FROM
+        (SELECT
+            DATE_TRUNC('month', payment_date) AS rental_month,
+            full_name,
+            SUM(payment_amout) AS sum_amount_per_month
+        FROM sub
+        WHERE full_name IN
+            (SELECT
+                full_name
+            FROM sub
+            WHERE DATE_PART('year', payment_date) = 2007
+            GROUP BY 1
+            ORDER BY SUM(payment_amout) DESC
+            LIMIT 10
+            )
+        GROUP BY 1,2
+        ORDER BY 2,1
+        ) AS sub2
+    ORDER BY 5 DESC
+    ) AS sub3
+WHERE diff IS NOT NULL
+LIMIT 1
