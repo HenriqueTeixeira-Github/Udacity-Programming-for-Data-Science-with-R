@@ -55,5 +55,44 @@ SELECT
     film_title,
     category_name,
     rental_duration,
-	NTILE(4) OVER (ORDER BY rental_duration) AS quartile
-FROM family_films AS ff
+	NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+FROM family_films AS ff;
+
+-- Question #3
+
+-- Finally, provide a table with the family-friendly film category, each of the quartiles,
+--and the corresponding count of movies within each combination of film category for each corresponding rental duration category.
+-- The resulting table should have three columns: film_name, standard_quartile and count
+
+WITH family_films AS (
+    SELECT
+        f.film_id AS film_id,
+        f.title AS film_title,
+        c.name AS category_name,
+        f.rental_duration AS rental_duration
+    FROM film AS f
+    JOIN film_category AS fc
+    ON f.film_id = fc.film_id
+    JOIN category AS c
+    ON c.category_id = fc.category_id
+    WHERE c.name IN ('Animation', 'Children','Classics','Comedy','Family','Music')
+)
+
+SELECT
+    category_name,
+    CASE
+        WHEN standard_quartile = 1 THEN '1. First Quartile'
+        WHEN standard_quartile = 2 THEN '2. Secound Quartile'
+        WHEN standard_quartile = 3 THEN '3. Third Quartile'
+        WHEN standard_quartile = 4 THEN '4. Fourth Quartile'
+    END AS standard_quartile_group,
+    COUNT(*) AS film_count
+FROM
+    (SELECT
+        film_title,
+        category_name,
+        rental_duration,
+    	NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+    FROM family_films AS ff) AS sub
+GROUP BY 1,2
+ORDER BY 1,2;
