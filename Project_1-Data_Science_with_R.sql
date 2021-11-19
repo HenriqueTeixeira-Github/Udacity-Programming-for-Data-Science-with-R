@@ -206,3 +206,155 @@ FROM
     ) AS sub3
 WHERE diff IS NOT NULL
 LIMIT 1
+
+
+-- FINAL PROJECT
+
+-- Which category was rented the most among the top 10 customers in 2007.
+
+-- Tables: Payment, Rental, Inventory, Film, film_category, Category
+
+WITH top_10_customers AS (
+    SELECT
+        ctm.customer_id AS customer_id,
+        p.amount AS payment_amout,
+        p.payment_date AS payment_date
+    FROM customer AS ctm
+    JOIN payment AS p
+    ON ctm.customer_id = p.customer_id
+)
+
+SELECT
+    c.name AS category,
+    COUNT(*)::integer  AS rental_count
+FROM customer AS ctm
+JOIN payment AS p
+ON ctm.customer_id = p.customer_id
+JOIN rental AS r
+ON r.rental_id = p.rental_id
+JOIN inventory AS i
+ON i.inventory_id = r.inventory_id
+JOIN film AS f
+ON f.film_id = i.film_id
+JOIN film_category AS fc
+ON f.film_id = fc.film_id
+JOIN category AS c
+ON c.category_id = fc.category_id
+WHERE ctm.customer_id IN
+    (SELECT
+        customer_id
+    FROM top_10_customers
+    WHERE DATE_PART('year', payment_date) = 2007
+    GROUP BY 1
+    ORDER BY SUM(payment_amout) DESC
+    LIMIT 10
+    )
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 1
+
+-- Among the top 10 actor/actress who acted in the films from the dxd rental, what is the average of the amount rented in 2017 by category.
+
+WITH top_10_actors AS (
+    SELECT
+        a.actor_id AS actor_id,
+        f.film_id AS film_id
+    FROM actor AS a
+    JOIN film_actor AS fa
+    ON a.actor_id = fa.actor_id
+    JOIN film AS f
+    ON f.film_id = fa.film_id
+)
+
+SELECT
+    category,
+    AVG(amount_retal)
+FROM
+    (SELECT
+        c.name AS category,
+        a.actor_id,
+        CONCAT(a.first_name, ' ', a.last_name) AS actor_full_name,
+        SUM(p.amount) AS amount_retal
+    FROM actor AS a
+    JOIN film_actor AS fa
+    ON a.actor_id = fa.actor_id
+    JOIN film AS f
+    ON f.film_id = fa.film_id
+    JOIN inventory AS i
+    ON f.film_id = i.film_id
+    JOIN rental AS r
+    ON r.inventory_id = i.inventory_id
+    JOIN payment AS p
+    ON p.rental_id = r.rental_id
+    JOIN film_category AS fc
+    ON f.film_id = fc.film_id
+    JOIN category AS c
+    ON c.category_id = fc.category_id
+    WHERE a.actor_id IN (
+        SELECT
+            actor_id
+        FROM top_10_actors
+        GROUP BY 1
+        ORDER BY COUNT(*) DESC
+        LIMIT 10
+    ) AND DATE_PART('year', p.payment_date) = 2007
+    GROUP BY 1,2,3
+    ORDER BY 4 DESC
+    ) AS sub
+GROUP BY 1
+ORDER BY 2 DESC
+
+-- The percentage of films in each category for each store
+SUM(p.amount) OVER (ORDER BY DATE_PART('month', p.payment_date)) AS amount_retal
+
+SELECT
+    COUNT(*)
+FROM
+    (SELECT
+        category,
+        percentage,
+        running_total,
+        LAG(running_total) OVER (ORDER BY percentage DESC),
+        CASE
+            WHEN (LAG(running_total) OVER (ORDER BY percentage DESC) <= 50 OR LAG(running_total) OVER (ORDER BY percentage DESC) IS NULL) THEN 'OK'
+            WHEN LAG(running_total) OVER (ORDER BY percentage DESC) > 50 THEN 'NOT OK'
+        END AS status
+    FROM
+        (SELECT
+            category,
+            percentage,
+            SUM(percentage) OVER (ORDER BY percentage DESC) AS running_total
+        FROM
+            (SELECT
+                category,
+                SUM(amount),
+                MAX(amount_retal),
+                SUM(amount)/MAX(amount_retal)*100 AS percentage
+            FROM
+                (SELECT
+                    f.film_id,
+                    c.name AS category,
+                    SUM(p.amount) OVER () AS amount_retal,
+                    p.amount AS amount
+                FROM actor AS a
+                JOIN film_actor AS fa
+                ON a.actor_id = fa.actor_id
+                JOIN film AS f
+                ON f.film_id = fa.film_id
+                JOIN inventory AS i
+                ON f.film_id = i.film_id
+                JOIN rental AS r
+                ON r.inventory_id = i.inventory_id
+                JOIN payment AS p
+                ON p.rental_id = r.rental_id
+                JOIN film_category AS fc
+                ON f.film_id = fc.film_id
+                JOIN category AS c
+                ON c.category_id = fc.category_id
+                ) AS sub
+            GROUP BY 1
+            ORDER BY 4 DESC
+        ) AS sub2
+    ) AS sub3
+) AS sub4
+WHERE status = 'OK'
