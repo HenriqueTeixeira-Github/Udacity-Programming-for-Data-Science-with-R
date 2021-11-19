@@ -305,7 +305,6 @@ GROUP BY 1
 ORDER BY 2 DESC
 
 -- The percentage of films in each category for each store
-SUM(p.amount) OVER (ORDER BY DATE_PART('month', p.payment_date)) AS amount_retal
 
 SELECT
     COUNT(*)
