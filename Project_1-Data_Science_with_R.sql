@@ -357,3 +357,36 @@ FROM
     ) AS sub3
 ) AS sub4
 WHERE status = 'OK'
+
+
+-- how much porcent from the total the are from movies that families watch (Animation, Children, Classics, Comedy, Family and Music)
+
+SELECT
+    type_group,
+    (SUM(num_rentals)/MAX(total)*100)::decimal(10,2) AS percentage
+FROM
+    (SELECT
+        category,
+        COUNT(*) AS num_rentals,
+        CASE
+            WHEN category IN ('Animation', 'Children','Classics','Comedy','Family','Music') THEN 'Family Film'
+            ELSE 'Not Family Film'
+        END AS type_group,
+        MAX(total) AS total
+    FROM
+        (SELECT
+            c.name AS category,
+            COUNT(*) OVER () AS total
+        FROM film AS f
+        JOIN film_category AS fc
+        ON f.film_id = fc.film_id
+        JOIN category AS c
+        ON c.category_id = fc.category_id
+        JOIN inventory AS i
+        ON f.film_id = i.film_id
+        JOIN rental AS r
+        ON r.inventory_id = i.inventory_id
+    ) AS sub
+    GROUP BY 1
+) AS sub2
+GROUP BY 1
