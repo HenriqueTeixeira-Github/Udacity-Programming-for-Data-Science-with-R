@@ -213,11 +213,12 @@ LIMIT 1
 -- Which category was rented the most among the top 10 customers in 2007.
 
 -- Tables: Payment, Rental, Inventory, Film, film_category, Category
+-- Sub Query Tables: Customer AND Payment
 
 WITH top_10_customers AS (
     SELECT
         ctm.customer_id AS customer_id,
-        p.amount AS payment_amout,
+        p.amount AS payment_amount,
         p.payment_date AS payment_date
     FROM customer AS ctm
     JOIN payment AS p
@@ -226,7 +227,7 @@ WITH top_10_customers AS (
 
 SELECT
     c.name AS category,
-    COUNT(*)::integer  AS rental_count
+    COUNT(*)::integer AS rental_count
 FROM customer AS ctm
 JOIN payment AS p
 ON ctm.customer_id = p.customer_id
@@ -246,29 +247,33 @@ WHERE ctm.customer_id IN
     FROM top_10_customers
     WHERE DATE_PART('year', payment_date) = 2007
     GROUP BY 1
-    ORDER BY SUM(payment_amout) DESC
+    ORDER BY SUM(payment_amount) DESC
     LIMIT 10
     )
 GROUP BY 1
 ORDER BY 2 DESC
-LIMIT 1
 
 -- Among the top 10 actor/actress who acted in the films from the dxd rental, what is the average of the amount rented in 2017 by category.
 
+-- Tables:
+-- Sub Query Tables: Actor, film_actor AND Film
+
 WITH top_10_actors AS (
     SELECT
-        a.actor_id AS actor_id,
-        f.film_id AS film_id
+        a.actor_id AS actor_id
     FROM actor AS a
     JOIN film_actor AS fa
     ON a.actor_id = fa.actor_id
     JOIN film AS f
     ON f.film_id = fa.film_id
+    GROUP BY 1
+    ORDER BY COUNT(*) DESC
+    LIMIT 10
 )
 
 SELECT
     category,
-    AVG(amount_retal)
+    AVG(amount_retal)::decimal(10,2) AS rental_average
 FROM
     (SELECT
         c.name AS category,
@@ -290,14 +295,9 @@ FROM
     ON f.film_id = fc.film_id
     JOIN category AS c
     ON c.category_id = fc.category_id
-    WHERE a.actor_id IN (
-        SELECT
-            actor_id
-        FROM top_10_actors
-        GROUP BY 1
-        ORDER BY COUNT(*) DESC
-        LIMIT 10
-    ) AND DATE_PART('year', p.payment_date) = 2007
+    WHERE
+        a.actor_id IN (SELECT * FROM top_10_actors) AND
+        DATE_PART('year', p.payment_date) = 2007
     GROUP BY 1,2,3
     ORDER BY 4 DESC
     ) AS sub
@@ -306,40 +306,41 @@ ORDER BY 2 DESC
 
 -- The percentage of films in each category for each store
 
+
+
 SELECT
+    film_rating,
     COUNT(*)
 FROM
     (SELECT
         category,
-        percentage,
+        film_rating,
+        amount_percentage,
         running_total,
-        LAG(running_total) OVER (ORDER BY percentage DESC),
+        LAG(running_total) OVER (film_rating_window),
         CASE
-            WHEN (LAG(running_total) OVER (ORDER BY percentage DESC) <= 50 OR LAG(running_total) OVER (ORDER BY percentage DESC) IS NULL) THEN 'OK'
-            WHEN LAG(running_total) OVER (ORDER BY percentage DESC) > 50 THEN 'NOT OK'
+            WHEN (LAG(running_total) OVER (film_rating_window) <= 50 OR LAG(running_total) OVER (film_rating_window) IS NULL) THEN 'OK'
+            WHEN LAG(running_total) OVER (film_rating_window) > 50 THEN 'NOT OK'
         END AS status
     FROM
         (SELECT
             category,
-            percentage,
-            SUM(percentage) OVER (ORDER BY percentage DESC) AS running_total
+            film_rating,
+            amount_percentage::decimal(9,2),
+            (SUM(amount_percentage) OVER (PARTITION BY film_rating ORDER BY amount_percentage DESC))::decimal(9,2) AS running_total
         FROM
             (SELECT
                 category,
-                SUM(amount),
-                MAX(amount_retal),
-                SUM(amount)/MAX(amount_retal)*100 AS percentage
+                film_rating,
+                SUM(amount)/MAX(amount_retal)*100 AS amount_percentage
             FROM
                 (SELECT
-                    f.film_id,
+                    f.film_id AS film_id,
                     c.name AS category,
-                    SUM(p.amount) OVER () AS amount_retal,
-                    p.amount AS amount
-                FROM actor AS a
-                JOIN film_actor AS fa
-                ON a.actor_id = fa.actor_id
-                JOIN film AS f
-                ON f.film_id = fa.film_id
+                    SUM(p.amount) OVER (PARTITION BY f.rating) AS amount_retal,
+                    p.amount AS amount,
+                    f.rating AS film_rating
+                FROM film AS f
                 JOIN inventory AS i
                 ON f.film_id = i.film_id
                 JOIN rental AS r
@@ -351,12 +352,16 @@ FROM
                 JOIN category AS c
                 ON c.category_id = fc.category_id
                 ) AS sub
-            GROUP BY 1
-            ORDER BY 4 DESC
+            GROUP BY 1,2
+            ORDER BY 2,3 DESC
         ) AS sub2
     ) AS sub3
+    WINDOW film_rating_window AS (PARTITION BY film_rating ORDER BY amount_percentage DESC)
+    ORDER BY 2,4
 ) AS sub4
 WHERE status = 'OK'
+GROUP BY 1
+ORDER BY 2 DESC
 
 
 -- how much porcent from the total the are from movies that families watch (Animation, Children, Classics, Comedy, Family and Music)
