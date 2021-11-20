@@ -210,7 +210,7 @@ LIMIT 1
 
 -- FINAL PROJECT
 
--- Which category was rented the most among the top 10 customers in 2007.
+-- Which category was rented the most among the top 10 customers.
 
 -- Tables: Payment, Rental, Inventory, Film, film_category, Category
 -- Sub Query Tables: Customer AND Payment
@@ -304,16 +304,15 @@ FROM
 GROUP BY 1
 ORDER BY 2 DESC
 
--- The percentage of films in each category for each store
 
-
+-- What is the minimum number of films that represent 50% of the total amount rented per film_rating?
 
 SELECT
     film_rating,
-    COUNT(*)
+    COUNT(*) AS min_films_to_reach_50perc
 FROM
     (SELECT
-        category,
+        film_id,
         film_rating,
         amount_percentage,
         running_total,
@@ -324,19 +323,18 @@ FROM
         END AS status
     FROM
         (SELECT
-            category,
+            film_id,
             film_rating,
             amount_percentage::decimal(9,2),
             (SUM(amount_percentage) OVER (PARTITION BY film_rating ORDER BY amount_percentage DESC))::decimal(9,2) AS running_total
         FROM
             (SELECT
-                category,
+                film_id,
                 film_rating,
                 SUM(amount)/MAX(amount_retal)*100 AS amount_percentage
             FROM
                 (SELECT
                     f.film_id AS film_id,
-                    c.name AS category,
                     SUM(p.amount) OVER (PARTITION BY f.rating) AS amount_retal,
                     p.amount AS amount,
                     f.rating AS film_rating
@@ -347,10 +345,6 @@ FROM
                 ON r.inventory_id = i.inventory_id
                 JOIN payment AS p
                 ON p.rental_id = r.rental_id
-                JOIN film_category AS fc
-                ON f.film_id = fc.film_id
-                JOIN category AS c
-                ON c.category_id = fc.category_id
                 ) AS sub
             GROUP BY 1,2
             ORDER BY 2,3 DESC
@@ -364,7 +358,7 @@ GROUP BY 1
 ORDER BY 2 DESC
 
 
--- how much porcent from the total the are from movies that families watch (Animation, Children, Classics, Comedy, Family and Music)
+-- How much porcent from the total the are from movies that families watch (Animation, Children, Classics, Comedy, Family and Music)
 
 SELECT
     type_group,
