@@ -207,13 +207,14 @@ FROM
 WHERE diff IS NOT NULL
 LIMIT 1
 
+/*
+FINAL PROJECT
 
--- FINAL PROJECT
+Question 1: What were the total Rental Orders per Category among the TOP 10 customers .
 
--- Which category was rented the most among the top 10 customers.
-
--- Tables: Payment, Rental, Inventory, Film, film_category, Category
--- Sub Query Tables: Customer AND Payment
+Tables: Rental, Inventory, Film, film_category AND Category
+Subquery Tables: Customer AND Payment
+*/
 
 WITH top_10_customers AS (
     SELECT
@@ -227,12 +228,10 @@ WITH top_10_customers AS (
 
 SELECT
     c.name AS category,
-    COUNT(*)::integer AS rental_count
+    COUNT(*)::INTEGER AS rental_count
 FROM customer AS ctm
-JOIN payment AS p
-ON ctm.customer_id = p.customer_id
 JOIN rental AS r
-ON r.rental_id = p.rental_id
+ON ctm.customer_id = r.customer_id
 JOIN inventory AS i
 ON i.inventory_id = r.inventory_id
 JOIN film AS f
@@ -245,7 +244,6 @@ WHERE ctm.customer_id IN
     (SELECT
         customer_id
     FROM top_10_customers
-    WHERE DATE_PART('year', payment_date) = 2007
     GROUP BY 1
     ORDER BY SUM(payment_amount) DESC
     LIMIT 10
@@ -253,10 +251,154 @@ WHERE ctm.customer_id IN
 GROUP BY 1
 ORDER BY 2 DESC
 
+/*
+FINAL PROJECT
+
+Question 2: The distribution of family type films rented from the total rental orders
+
+Tables: Rental, Inventory, Film, film_category AND Category
+*/
+
+SELECT
+    type_group,
+    (SUM(num_rentals)/MAX(total)*100)::decimal(10,2) AS percentage
+FROM
+    (SELECT
+        category,
+        COUNT(*) AS num_rentals,
+        CASE
+            WHEN category IN ('Animation', 'Children','Classics','Comedy','Family','Music') THEN 'Family Film'
+            ELSE 'Not Family Film'
+        END AS type_group,
+        MAX(total) AS total
+    FROM
+        (SELECT
+            c.name AS category,
+            COUNT(*) OVER () AS total
+        FROM film AS f
+        JOIN film_category AS fc
+        ON f.film_id = fc.film_id
+        JOIN category AS c
+        ON c.category_id = fc.category_id
+        JOIN inventory AS i
+        ON f.film_id = i.film_id
+        JOIN rental AS r
+        ON r.inventory_id = i.inventory_id
+    ) AS sub
+    GROUP BY 1
+) AS sub2
+GROUP BY 1
+
+
+/*
+FINAL PROJECT
+
+Question 3: The distribution of family type films rented from the total rental orders
+*/
+
+WITH family_films AS (
+    SELECT
+        f.film_id AS film_id,
+        f.title AS film_title,
+        c.name AS category_name,
+        f.rental_duration AS rental_duration
+    FROM film AS f
+    JOIN film_category AS fc
+    ON f.film_id = fc.film_id
+    JOIN category AS c
+    ON c.category_id = fc.category_id
+    WHERE c.name IN ('Animation', 'Children','Classics','Comedy','Family','Music')
+)
+
+SELECT
+    category_name,
+    CASE
+        WHEN standard_quartile = 1 THEN '1. First Quartile'
+        WHEN standard_quartile = 2 THEN '2. Secound Quartile'
+        WHEN standard_quartile = 3 THEN '3. Third Quartile'
+        WHEN standard_quartile = 4 THEN '4. Fourth Quartile'
+    END AS standard_quartile_group,
+    COUNT(*) AS film_count
+FROM
+    (SELECT
+        film_title,
+        category_name,
+        rental_duration,
+    	NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+    FROM family_films AS ff) AS sub
+GROUP BY 1,2
+ORDER BY 1,2;
+
+
+/*
+FINAL PROJECT
+
+Question 4: What is the minimum number of films to reach 50% of the total amount rented per film_rating?
+*/
+
+SELECT
+    film_rating,
+    COUNT(*) AS min_films_to_reach_50perc
+FROM
+    (SELECT
+        film_id,
+        film_rating,
+        amount_percentage,
+        running_total,
+        LAG(running_total) OVER (film_rating_window),
+        CASE
+            WHEN (LAG(running_total) OVER (film_rating_window) <= 50 OR
+                LAG(running_total) OVER (film_rating_window) IS NULL) THEN 'OK'
+            WHEN LAG(running_total) OVER (film_rating_window) > 50 THEN 'NOT OK'
+        END AS status
+    FROM
+        (SELECT
+            film_id,
+            film_rating,
+            amount_percentage::decimal(9,2),
+            (SUM(amount_percentage) OVER (PARTITION BY film_rating ORDER BY amount_percentage DESC))::decimal(9,2) AS running_total
+        FROM
+            (SELECT
+                film_id,
+                film_rating,
+                SUM(amount)/MAX(amount_retal)*100 AS amount_percentage
+            FROM
+                (SELECT
+                    f.film_id AS film_id,
+                    SUM(p.amount) OVER (PARTITION BY f.rating) AS amount_retal,
+                    p.amount AS amount,
+                    f.rating AS film_rating
+                FROM film AS f
+                JOIN inventory AS i
+                ON f.film_id = i.film_id
+                JOIN rental AS r
+                ON r.inventory_id = i.inventory_id
+                JOIN payment AS p
+                ON p.rental_id = r.rental_id
+                ) AS sub
+            GROUP BY 1,2
+            ORDER BY 2,3 DESC
+        ) AS sub2
+    ) AS sub3
+    WINDOW film_rating_window AS (PARTITION BY film_rating ORDER BY amount_percentage DESC)
+    ORDER BY 2,4
+) AS sub4
+WHERE status = 'OK'
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+
+
+/*
+
+EXTRA:
+
 -- Among the top 10 actor/actress who acted in the films from the dxd rental, what is the average of the amount rented in 2017 by category.
 
 -- Tables:
 -- Sub Query Tables: Actor, film_actor AND Film
+*/
 
 WITH top_10_actors AS (
     SELECT
@@ -303,89 +445,3 @@ FROM
     ) AS sub
 GROUP BY 1
 ORDER BY 2 DESC
-
-
--- What is the minimum number of films that represent 50% of the total amount rented per film_rating?
-
-SELECT
-    film_rating,
-    COUNT(*) AS min_films_to_reach_50perc
-FROM
-    (SELECT
-        film_id,
-        film_rating,
-        amount_percentage,
-        running_total,
-        LAG(running_total) OVER (film_rating_window),
-        CASE
-            WHEN (LAG(running_total) OVER (film_rating_window) <= 50 OR LAG(running_total) OVER (film_rating_window) IS NULL) THEN 'OK'
-            WHEN LAG(running_total) OVER (film_rating_window) > 50 THEN 'NOT OK'
-        END AS status
-    FROM
-        (SELECT
-            film_id,
-            film_rating,
-            amount_percentage::decimal(9,2),
-            (SUM(amount_percentage) OVER (PARTITION BY film_rating ORDER BY amount_percentage DESC))::decimal(9,2) AS running_total
-        FROM
-            (SELECT
-                film_id,
-                film_rating,
-                SUM(amount)/MAX(amount_retal)*100 AS amount_percentage
-            FROM
-                (SELECT
-                    f.film_id AS film_id,
-                    SUM(p.amount) OVER (PARTITION BY f.rating) AS amount_retal,
-                    p.amount AS amount,
-                    f.rating AS film_rating
-                FROM film AS f
-                JOIN inventory AS i
-                ON f.film_id = i.film_id
-                JOIN rental AS r
-                ON r.inventory_id = i.inventory_id
-                JOIN payment AS p
-                ON p.rental_id = r.rental_id
-                ) AS sub
-            GROUP BY 1,2
-            ORDER BY 2,3 DESC
-        ) AS sub2
-    ) AS sub3
-    WINDOW film_rating_window AS (PARTITION BY film_rating ORDER BY amount_percentage DESC)
-    ORDER BY 2,4
-) AS sub4
-WHERE status = 'OK'
-GROUP BY 1
-ORDER BY 2 DESC
-
-
--- How much porcent from the total the are from movies that families watch (Animation, Children, Classics, Comedy, Family and Music)
-
-SELECT
-    type_group,
-    (SUM(num_rentals)/MAX(total)*100)::decimal(10,2) AS percentage
-FROM
-    (SELECT
-        category,
-        COUNT(*) AS num_rentals,
-        CASE
-            WHEN category IN ('Animation', 'Children','Classics','Comedy','Family','Music') THEN 'Family Film'
-            ELSE 'Not Family Film'
-        END AS type_group,
-        MAX(total) AS total
-    FROM
-        (SELECT
-            c.name AS category,
-            COUNT(*) OVER () AS total
-        FROM film AS f
-        JOIN film_category AS fc
-        ON f.film_id = fc.film_id
-        JOIN category AS c
-        ON c.category_id = fc.category_id
-        JOIN inventory AS i
-        ON f.film_id = i.film_id
-        JOIN rental AS r
-        ON r.inventory_id = i.inventory_id
-    ) AS sub
-    GROUP BY 1
-) AS sub2
-GROUP BY 1
