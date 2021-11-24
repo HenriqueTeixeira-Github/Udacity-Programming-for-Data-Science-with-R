@@ -25,6 +25,12 @@ median(iris$Sepal.Length)
 sd(iris$Sepal.Length)
 #Returns the standard deviation of one column of the dataset.
 
+min(iris$Sepal.Length)
+#Returns the minimum value of one column of the dataset.
+
+max(iris$Sepal.Length)
+#Returns the maximum value of onee column of the dataset.
+
 virginicas = subset(iris, Species=='virginica')
 #Creates a subset from the iris dataset with the rows that meet the criteria specified.
 dim(iris)
