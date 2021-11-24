@@ -28,3 +28,9 @@ which(heights <= 70)
 
 eye.colors = c('blue', 'green', 'brown', 'brown')
 subset(eye.colors, heights < 70)
+
+
+x <- seq(1,27)
+dim(x) <- c(3,9)
+is.array(x)
+is.matrix(x)
