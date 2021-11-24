@@ -41,3 +41,22 @@ dim (virginicas_big_length)
 
 summary(iris)
 #Returns all the summary statistics for every column in the dataframe.
+
+
+#Dataset Quiz 1
+
+#1.List the dimension (column) names
+names(iris)
+
+#2.Show the fist four rows
+head(iris, 4) #or iris[1:4,]
+
+#3.Show the first row
+iris[1,] #or head(iris,1)
+
+#4.Sepal length of the first 10 samples
+iris$Sepal.Length[1:10] #or head(iris$Sepal.Length,10)
+
+#5.Allow replacing iris$Sepal.Length with shorter Sepal.Length
+attach(iris, warn.conflicts = FALSE)
+
