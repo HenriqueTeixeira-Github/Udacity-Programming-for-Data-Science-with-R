@@ -43,7 +43,7 @@ summary(iris)
 #Returns all the summary statistics for every column in the dataframe.
 
 
-#Dataset Quiz 1
+#DATASET QUIZ 1
 
 #1.List the dimension (column) names
 names(iris)
@@ -59,4 +59,24 @@ iris$Sepal.Length[1:10] #or head(iris$Sepal.Length,10)
 
 #5.Allow replacing iris$Sepal.Length with shorter Sepal.Length
 attach(iris, warn.conflicts = FALSE)
+
+
+#DATASET QUIZ 2
+
+#1.Average of Sepal.Length across all rows
+mean(iris$Sepal.Length)
+
+#2.Means of all the numeric columns
+colMeans(iris[,1:4])
+
+#3.Create a subset of sepal lengths less than 5 in in the setosa species
+setosa_small_length = subset(iris, Species=='setosa' & Sepal.Length < 5)
+
+#4.Number of rows corresponding to setosa species
+num_rows = dim(subset(iris, Species=='setosa'))[1]
+num_rows
+
+#5.Summary of the dataset iris
+summary(iris)
+
 
