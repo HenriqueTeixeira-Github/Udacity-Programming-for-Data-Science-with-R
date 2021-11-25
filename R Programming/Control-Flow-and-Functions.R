@@ -81,3 +81,31 @@ for (num in z.array){
   factorial.result = num*factorial.result
 }
 
+# FUNCTIONS
+
+#Example 1
+
+square.num = function(num, expo){
+  x = num**expo
+  return(x)
+}
+
+square.num(3,2)
+
+# Function to return the factorial of a given number
+
+factorial = function(num) {
+  
+  factorial_value = 1
+  z.array = seq(1,num, 1)
+  
+  for (num in z.array){
+    factorial_value = num*factorial_value
+  }
+  
+  return(factorial_value)
+}
+
+factorial(7)
+
+
