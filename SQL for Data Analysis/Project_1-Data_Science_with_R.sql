@@ -1,7 +1,6 @@
 -- Question Set #1
 
 -- Question #1
-
 -- We want to understand more about the movies that families are watching. The following categories are considered family movies: Animation, Children, Classics, Comedy, Family and Music.
 --Create a query that lists each movie, the film category it is classified in, and the number of times it has been rented out.
 
@@ -61,7 +60,7 @@ FROM family_films AS ff;
 -- Question #3
 
 -- Finally, provide a table with the family-friendly film category, each of the quartiles,
---and the corresponding count of movies within each combination of film category for each corresponding rental duration category.
+-- and the corresponding count of movies within each combination of film category for each corresponding rental duration category.
 -- The resulting table should have three columns: film_name, standard_quartile and count
 
 WITH family_films AS (
@@ -100,7 +99,6 @@ ORDER BY 1,2;
 -- Question Set #2
 
 -- Question #1
-
 -- We want to find out how the two stores compare in their count of rental orders during every month for all the years we have data for.
 -- Write a query that returns the store ID for the store, the year and month and the number of rental orders each store has fulfilled for that month.
 -- Your table should include a column for each of the following: year, month, store ID and count of rental orders fulfilled during that month.
@@ -119,7 +117,6 @@ GROUP BY 1,2,3
 ORDER BY 4 DESC
 
 -- Question #2
-
 -- We would like to know who were our top 10 paying customers, how many payments they made on a monthly basis during 2007, and what was the amount of the monthly payments.
 -- Can you write a query to capture the customer name, month and year of payment, and total payment amount for each month by these top 10 paying customers?
 
@@ -153,9 +150,7 @@ WHERE full_name IN
 GROUP BY 1,2
 ORDER BY 2,1
 
-
 -- Question #3
-
 -- Finally, for each of these top 10 paying customers, I would like to find out the difference across their monthly payments during 2007. Please go ahead and write a query to compare the payment amounts in each successive month.
 -- Repeat this for each of these 10 paying customers. Also, it will be tremendously helpful if you can identify the customer name who paid the most difference in terms of payments.
 
@@ -208,12 +203,61 @@ WHERE diff IS NOT NULL
 LIMIT 1
 
 /*
+EXTRA:
+-- Among the top 10 actor/actress who acted in the films from the dxd rental, what is the average of the amount rented in 2017 by category.
+*/
+
+WITH top_10_actors AS (
+    SELECT
+        a.actor_id AS actor_id
+    FROM actor AS a
+    JOIN film_actor AS fa
+    ON a.actor_id = fa.actor_id
+    JOIN film AS f
+    ON f.film_id = fa.film_id
+    GROUP BY 1
+    ORDER BY COUNT(*) DESC
+    LIMIT 10
+)
+
+SELECT
+    category,
+    AVG(amount_retal)::decimal(10,2) AS rental_average
+FROM
+    (SELECT
+        c.name AS category,
+        a.actor_id,
+        CONCAT(a.first_name, ' ', a.last_name) AS actor_full_name,
+        SUM(p.amount) AS amount_retal
+    FROM actor AS a
+    JOIN film_actor AS fa
+    ON a.actor_id = fa.actor_id
+    JOIN film AS f
+    ON f.film_id = fa.film_id
+    JOIN inventory AS i
+    ON f.film_id = i.film_id
+    JOIN rental AS r
+    ON r.inventory_id = i.inventory_id
+    JOIN payment AS p
+    ON p.rental_id = r.rental_id
+    JOIN film_category AS fc
+    ON f.film_id = fc.film_id
+    JOIN category AS c
+    ON c.category_id = fc.category_id
+    WHERE
+        a.actor_id IN (SELECT * FROM top_10_actors) AND
+        DATE_PART('year', p.payment_date) = 2007
+    GROUP BY 1,2,3
+    ORDER BY 4 DESC
+    ) AS sub
+GROUP BY 1
+ORDER BY 2 DESC
+
+----------------------------FINAL PROJECT----------------------------
+
+/*
 FINAL PROJECT
-
 Question 1: What were the total Rental Orders per Category among the TOP 10 customers .
-
-Tables: Rental, Inventory, Film, film_category AND Category
-Subquery Tables: Customer AND Payment
 */
 
 WITH top_10_customers AS (
@@ -253,10 +297,7 @@ ORDER BY 2 DESC
 
 /*
 FINAL PROJECT
-
 Question 2: The distribution of family type films rented from the total rental orders
-
-Tables: Rental, Inventory, Film, film_category AND Category
 */
 
 SELECT
@@ -289,10 +330,8 @@ FROM
 ) AS sub2
 GROUP BY 1
 
-
 /*
 FINAL PROJECT
-
 Question 3: The distribution of family type films rented from the total rental orders
 */
 
@@ -332,7 +371,6 @@ ORDER BY 1,2;
 
 /*
 FINAL PROJECT
-
 Question 4: What is the minimum number of films to reach 50% of the total amount rented per film_rating?
 */
 
@@ -387,61 +425,4 @@ WHERE status = 'OK'
 GROUP BY 1
 ORDER BY 2 DESC
 
-
-
-
-/*
-
-EXTRA:
-
--- Among the top 10 actor/actress who acted in the films from the dxd rental, what is the average of the amount rented in 2017 by category.
-
--- Tables:
--- Sub Query Tables: Actor, film_actor AND Film
-*/
-
-WITH top_10_actors AS (
-    SELECT
-        a.actor_id AS actor_id
-    FROM actor AS a
-    JOIN film_actor AS fa
-    ON a.actor_id = fa.actor_id
-    JOIN film AS f
-    ON f.film_id = fa.film_id
-    GROUP BY 1
-    ORDER BY COUNT(*) DESC
-    LIMIT 10
-)
-
-SELECT
-    category,
-    AVG(amount_retal)::decimal(10,2) AS rental_average
-FROM
-    (SELECT
-        c.name AS category,
-        a.actor_id,
-        CONCAT(a.first_name, ' ', a.last_name) AS actor_full_name,
-        SUM(p.amount) AS amount_retal
-    FROM actor AS a
-    JOIN film_actor AS fa
-    ON a.actor_id = fa.actor_id
-    JOIN film AS f
-    ON f.film_id = fa.film_id
-    JOIN inventory AS i
-    ON f.film_id = i.film_id
-    JOIN rental AS r
-    ON r.inventory_id = i.inventory_id
-    JOIN payment AS p
-    ON p.rental_id = r.rental_id
-    JOIN film_category AS fc
-    ON f.film_id = fc.film_id
-    JOIN category AS c
-    ON c.category_id = fc.category_id
-    WHERE
-        a.actor_id IN (SELECT * FROM top_10_actors) AND
-        DATE_PART('year', p.payment_date) = 2007
-    GROUP BY 1,2,3
-    ORDER BY 4 DESC
-    ) AS sub
-GROUP BY 1
-ORDER BY 2 DESC
+-- PROJECT APPROVED (22/11/2021 - UDACITY)
